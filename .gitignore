@@ -1,0 +1,8 @@
+﻿build/
+dist/
+сборка/
+__pycache__/
+*.pyc
+*.zip
+Dicts/tib_dict_universal.dsl
+Текстовый документ.txt

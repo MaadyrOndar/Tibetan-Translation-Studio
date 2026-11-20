@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tibetan Translation Studio v2.6</title>
+	<link href="https://googleapis.com" rel="stylesheet">
+    <style>
+         :root {
+            --bg-main: #f8f9fa;
+            --bg-panel: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #2d3748;
+            --accent-color: #4a5568;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        /* Применяем классический Noto Serif ко всему телу документа */
+        body { font-family: "Noto Serif", Georgia, serif; background: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Верхняя шапка управления */
+        header { background: #1a202c; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .logo { font-weight: bold; color: #cbd5e0; font-size: 16px; }
+        
+        .file-upload-btn { background: #3182ce; color: white; padding: 8px 16px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; display: inline-block; transition: background 0.2s; }
+        .file-upload-btn:hover { background: #2b6cb0; }
+        #file-input { display: none; }
+
+        /* Рабочая область: левое 40%, правое 60% */
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+        .panel { display: flex; flex-direction: column; background: var(--bg-panel); }
+        .panel-header { background: #edf2f7; padding: 10px 15px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #4a5568; border-bottom: 1px solid var(--border-color); font-family: -apple-system, sans-serif; }
+        .panel-body { padding: 20px; flex: 1; overflow-y: auto; }
+
+        /* Левая панель анализа текста (40%) */
+        #panel-analysis { width: 40%; border-right: 1px solid var(--border-color); }
+        .sentence-block { background: #fdfdfd; border: 1px solid #edf2f7; border-left: 4px solid #cbd5e0; padding: 12px 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        
+        /* Левое окно: Крупный и четкий оригинальный шрифт Noto Serif Tibetan */
+        .tibetan-stream { line-height: 2.2; font-size: 28px !important; text-align: justify; word-wrap: break-word; font-family: "Noto Serif Tibetan", serif !important; }
+        .tib-word { display: inline-block; padding: 0 4px; border-radius: 4px; cursor: pointer; transition: all 0.15s ease; margin-right: 1px; border-bottom: 2px solid transparent; font-size: 28px !important; font-family: "Noto Serif Tibetan", serif !important; }
+        .tib-word:hover { background: #e2e8f0; color: #000; }
+        .tib-word.active { background: #feebc8; border-bottom-color: #dd6b20; color: #9c4221; font-weight: bold; }
+
+        /* Правая панель словарей (60%) */
+        #panel-dictionary { width: 60%; }
+        .dict-tabs { display: flex; flex-wrap: wrap; background: #f7fafc; border-bottom: 1px solid var(--border-color); max-height: 120px; overflow-y: auto; font-family: -apple-system, sans-serif; }
+        .tab-btn { padding: 10px 14px; border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 600; color: #718096; border-bottom: 2px solid transparent; border-right: 1px solid #edf2f7; text-align: left; }
+        .tab-btn:hover { background: #edf2f7; }
+        .tab-btn.active { color: #3182ce; border-bottom-color: #3182ce; background: #fff; font-weight: bold; }
+        
+        .dict-container { padding: 20px; flex: 1; overflow-y: auto; display: none; }
+        .dict-container.active { display: block; }
+        
+        /* Крупный заголовок слова вверху карточки словаря */
+        .word-title { font-size: 44px !important; font-weight: bold; margin-bottom: 5px; color: #1a202c; border-bottom: 2px solid #edf2f7; padding-bottom: 5px; font-family: "Noto Serif Tibetan", serif !important; }
+        .word-meta { font-size: 13px; color: #718096; margin-bottom: 15px; font-style: italic; font-family: -apple-system, sans-serif !important; }
+        
+        /* Блок статьи в словаре */
+        .meaning-item { background: #f7fafc; border-left: 4px solid #cbd5e0; padding: 12px 16px; margin-bottom: 10px; border-radius: 0 6px 6px 0; white-space: pre-wrap; }
+
+        /* ========================================================================= */
+        /* УНИВЕРСАЛЬНАЯ НАСТРОЙКА ШРИФТОВ ДЛЯ ТЕКСТА СЛОВАРЕЙ                       */
+        /* ========================================================================= */
+        
+        /* Связываем шрифты Noto Serif и Noto Serif Tibetan вместе на правой панели */
+        #panel-dictionary, 
+        .dict-container, 
+        .meaning-item, 
+        .meaning-line,
+        #dict-articles-container * {
+            font-family: "Noto Serif Tibetan", "Noto Serif", Georgia, serif !important;
+        }
+
+        /* Задаем базовый размер для английского и русского языков */
+        .meaning-item, .meaning-line, #dict-articles-container * {
+            font-size: 16px;
+            line-height: 1.7;
+        }
+
+        /* Находим любую тибетскую вязь внутри HTML-кода статей и принудительно увеличиваем до 24px */
+        /* Браузер сам поймет, какие символы тибетские, и применит к ним этот увеличенный размер */
+        #dict-articles-container, .meaning-item {
+            font-size: 16px;
+        }
+
+        /* Специальное правило, увеличивающее именно тибетские предложения в словаре */
+        #dict-articles-container b, 
+        #dict-articles-container div,
+        .meaning-line {
+            font-size: inherit;
+        }
+        
+        /* Оформление синих плашек-источников для DSL */
+        .dict-source-tag { color: #1a365d; font-weight: 700; background: #ebf8ff; padding: 2px 6px; border-radius: 4px; border: 1px solid #bee3f8; display: inline-block; margin-right: 6px; font-size: 14px !important; font-family: -apple-system, sans-serif !important; }
+        .meaning-line { margin-bottom: 10px; }
+        .placeholder-text { color: #a0aec0; text-align: center; margin-top: 40px; font-style: italic; font-family: -apple-system, sans-serif; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">Tibetan Translation Studio v2.6</div>
+        <div>
+            <label class="file-upload-btn" for="file-input">Открыть текстовый файл и разобрать</label>
+            <input type="file" id="file-input" accept=".txt" onchange="handleFileSelect(event)">
+        </div>
+    </header>
+
+    <div class="workspace">
+        <div class="panel" id="panel-analysis">
+            <div class="panel-header">Текст документа (По предложениям)</div>
+            <div class="panel-body">
+                <div id="text-output">
+                    <div class="placeholder-text">Нажмите кнопку выше, чтобы загрузить тибетский текстовый файл (.txt)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-dictionary">
+            <div class="panel-header">Перевод из словарей (Переключение стрелками ◄ и ►)</div>
+            <div class="dict-tabs" id="dict-tabs-container"></div>
+            <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;" id="dict-articles-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentDictionaryData = {};
+        let activeTabIndex = 0;
+
+async function handleFileSelect(event) {
+            // ИСПРАВЛЕНО: берём первый файл из массива выбранных файлов [0]
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const outputContainer = document.getElementById('text-output');
+                outputContainer.innerHTML = '<div class="placeholder-text">Анализируем текст и подключаем словари...</div>';
+
+                try {
+                    const response = await fetch('/parse', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: text })
+                    });
+                    
+                    const result = await response.json();
+                    renderProcessedText(result.tokens);
+                    currentDictionaryData = result.dictionary;
+                    renderDictTabs(result.dictionary_names);
+
+                } catch (error) {
+                    outputContainer.innerHTML = '<div class="placeholder-text" style="color: #e53e3e;">Ошибка соединения с сервером Python!</div>';
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function renderProcessedText(tokens) {
+            const container = document.getElementById('text-output');
+            container.innerHTML = '';
+
+            let currentBlock = document.createElement('div');
+            currentBlock.className = 'sentence-block';
+            let currentStream = document.createElement('div');
+            currentStream.className = 'tibetan-stream';
+            currentBlock.appendChild(currentStream);
+            container.appendChild(currentBlock);
+
+            tokens.forEach(token => {
+                if (token.text.includes('\n')) {
+                    currentBlock = document.createElement('div');
+                    currentBlock.className = 'sentence-block';
+                    currentStream = document.createElement('div');
+                    currentStream.className = 'tibetan-stream';
+                    currentBlock.appendChild(currentStream);
+                    container.appendChild(currentBlock);
+                } else if (token.type === 'SPACE') {
+                    currentStream.innerHTML += ' ';
+                } else if (token.type === 'PUNCT') {
+                    currentStream.innerHTML += `<span style="color: #718096; padding: 0 2px;">${token.text}</span>`;
+                } else {
+                    currentStream.innerHTML += `<span class="tib-word" onclick="getWordTranslation(this, '${token.text_cleaned}', '${token.lemma}')">${token.text}</span>`;
+                }
+            });
+            
+            document.querySelectorAll('.tibetan-stream').forEach(el => {
+                if(!el.innerHTML.trim()) el.parentElement.remove();
+            });
+        }
+
+        function renderDictTabs(dictNames) {
+            const tabsContainer = document.getElementById('dict-tabs-container');
+            const articlesContainer = document.getElementById('dict-articles-container');
+            
+            tabsContainer.innerHTML = '';
+            articlesContainer.innerHTML = '';
+            activeTabIndex = 0;
+
+            dictNames.forEach((name, index) => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${index === 0 ? 'active' : ''}`;
+                btn.innerText = name.replace('.dsl', '').replace('.dict', '');
+                
+                // ИСПРАВЛЕНО: добавлена константа targetPanelId для безопасной работы внутри onclick
+                const targetPanelId = `dict-panel-${index}`;
+                btn.onclick = (e) => {
+                    activeTabIndex = index;
+                    switchTab(targetPanelId, btn);
+                };
+                tabsContainer.appendChild(btn);
+
+                const contentDiv = document.createElement('div');
+                contentDiv.id = `dict-panel-${index}`;
+                contentDiv.className = `dict-container ${index === 0 ? 'active' : ''}`;
+                contentDiv.innerHTML = `
+                    <div class="word-title" id="title-${index}">---</div>
+                    <div class="word-meta" id="meta-${index}">Словарь: ${name}</div>
+                    <div id="meanings-${index}"></div>
+                `;
+                articlesContainer.appendChild(contentDiv);
+            });
+        }
+        function getWordTranslation(element, wordClean, lemma) {
+            document.querySelectorAll('.tib-word').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            const wordData = currentDictionaryData[wordClean] || currentDictionaryData[lemma] || null;
+            const dictContainers = document.querySelectorAll('.dict-container');
+            
+            dictContainers.forEach((container, index) => {
+                const dictName = document.querySelectorAll('.tab-btn')[index].innerText;
+                
+                document.getElementById(`title-${index}`).innerText = wordClean;
+                document.getElementById(`meta-${index}`).innerText = `Форма: ${wordClean} | Лемма: ${lemma}`;
+                
+                const meaningsBox = document.getElementById(`meanings-${index}`);
+                meaningsBox.innerHTML = '';
+
+                if (wordData && wordData[dictName]) {
+                    wordData[dictName].forEach(art => {
+                        let formattedHTML = '';
+
+                        // Проверяем: если текст УЖЕ содержит HTML-теги разметки от StarDict
+                        if (art.includes('<br') || art.includes('<b')) {
+                            // Выводим как есть — браузер сам поймет теги цвета и переносов строк
+                            formattedHTML = `<div style="line-height: 1.6;">${art}</div>`;
+                        } else {
+                            // Если это чистый текст из DSL словарей — применяем нашу умную разбивку
+                            let cleanArt = art.replace(/\\\[/g, '['); cleanArt = cleanArt.replace(/(\s*\[[^\]]+\]\s*:)/g, '\n\$1');
+                            let lines = cleanArt.split('\n');
+
+                            lines.forEach(line => {
+                                let trimmedLine = line.trim();
+                                if (!trimmedLine) return;
+
+                                let match = trimmedLine.match(/^\[(.*?)\]\s*:(.*)/);
+                                if (match) {
+                                    formattedHTML += `
+                                        <div class="meaning-line" style="margin-bottom: 14px; line-height: 1.6;">
+                                            <span class="dict-source-tag">[${match[1]}]</span>${match[2]}
+                                        </div>`;
+                                } else {
+                                    formattedHTML += `<div class="meaning-line" style="margin-bottom: 8px; line-height: 1.6;">${trimmedLine}</div>`;
+                                }
+                            });
+                        }
+
+                        meaningsBox.innerHTML += `<div class="meaning-item" style="padding: 15px; border-radius: 6px;">${formattedHTML}</div>`;
+                    });
+                } else {
+                    meaningsBox.innerHTML = '<div class="placeholder-text">Перевод не найден</div>';
+                }
+            });
+        }
+
+
+
+
+
+
+        function switchTab(panelId, btnElement) {
+            document.querySelectorAll('.dict-container').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+            
+            const targetPanel = document.getElementById(panelId);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
+            if (btnElement) {
+                btnElement.classList.add('active');
+            }
+        }
+
+        // Хэндлер горячих клавиш: переключение по стрелкам клавиатуры
+        window.addEventListener('keydown', function(event) {
+            const tabs = document.querySelectorAll('.tab-btn');
+            if (tabs.length === 0) return;
+
+            if (event.key === 'ArrowRight') {
+                // Листаем вправо
+                activeTabIndex = (activeTabIndex + 1) % tabs.length;
+                tabs[activeTabIndex].click();
+                event.preventDefault();
+            } else if (event.key === 'ArrowLeft') {
+                // Листаем влево
+                activeTabIndex = (activeTabIndex - 1 + tabs.length) % tabs.length;
+                tabs[activeTabIndex].click();
+                event.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
+
